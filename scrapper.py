@@ -4,6 +4,7 @@ import time
 import typing
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
@@ -51,14 +52,60 @@ class CommentScrapper(ABC):
             reviews_tab.send_keys(Keys.ENTER)
             time.sleep(3)
 
-            # Скрапинг комментариев
-            comments = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__body-text')))
-            usernames = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__author-name')))
+        
+            js = self.driver.execute_script
 
-            for i in range(len(comments)):
-                username = usernames[i].text
-                comment = comments[i].text
-                print(username, comment)
+            processed_comments = set()
+            load_more = True
+
+            # Элемент, содержащий список комментариев
+            comments_list = self.driver.find_element(By.CLASS_NAME, "business-reviews-card-view__reviews-container")  
+            scrolled_container = self.driver.find_element(By.CLASS_NAME, "scroll__container")  # Элемент контейнера для прокрутки
+
+            while load_more:
+                # Получаем видимые комментарии
+                visible_comments = comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")  # Замените на класс комментариев
+                if len(visible_comments) == 0:
+                    print("No comments found")
+                    return
+
+                # Обрабатываем видимые комментарии
+                for comment_element in visible_comments:
+                    comment_text = comment_element.text
+                    if comment_text in processed_comments:
+                        continue
+
+                    # Запоминаем уникальные комментарии
+                    processed_comments.add(comment_text)
+                    print(f"New comment: {comment_text}")
+
+                try:
+                    # Прокручиваем до конца списка комментариев
+                    js("arguments[0].scrollIntoView(true);", visible_comments[-1])
+                    time.sleep(2)  # Небольшая пауза для загрузки новых элементов
+
+                    # Ожидаем появления новых комментариев
+                    wait.until(lambda driver: len(comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")) > len(visible_comments))
+
+                except TimeoutException:
+                    print("No more comments to load!")
+                    load_more = False
+
+                finally:
+                    # Проверка: если новых комментариев не добавилось, останавливаем прокрутку
+                    new_visible_comments = comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")
+                    if len(new_visible_comments) == len(processed_comments):
+                        load_more = False
+
+            print("Finished scrolling and scraping comments.")
+
+            # comments = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__body-text'))))
+            # usernames = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__author-name')))
+
+            # for i in range(len(comments)):
+            #     username = usernames[i].text
+            #     comment = comments[i].text
+            #     print(i, username, comment)
 
         except Exception as e:
             print("что-то не так", e)
@@ -96,8 +143,9 @@ class ScrapperFactory():
 
 def main() -> None:
     scrapper = ScrapperFactory.make_scrapper("Chrome")
-    scrapper.get_sorce_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
-    # scrapper.get_sorce_code("https://yandex.by/maps/org/produkty/143566380911/?ll=28.913311%2C53.162192&z=16")
+    # scrapper.get_sorce_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
+    # scrapper.get_sorce_code("https://yandex.by/maps/org/kostel_sviatykh_symona_ta_oleny/1013424966/?ll=27.547675%2C53.896320&z=17")
+    scrapper.get_sorce_code("https://yandex.by/maps/org/lyubimoye_mesto/183920941504/?ll=29.224177%2C53.141682&z=14")
     # scrapper.get_url("МинскБары.json")
     scrapper.close_driver()
 
