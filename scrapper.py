@@ -41,12 +41,11 @@ class CommentScrapper(ABC):
             print("страница не прогружается")
         try:
             wait = WebDriverWait(self.driver, 15)
-            # Прокрутка к элементу
+            
             reviews_tab = wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'tabs-select-view__label') and text()='Отзывы']")))
             ActionChains(self.driver).move_to_element(reviews_tab).perform()
             self.driver.execute_script("arguments[0].style.border='3px solid red'", reviews_tab)
 
-            # Ожидание возможных анимаций
             time.sleep(2)
 
             reviews_tab.send_keys(Keys.ENTER)
@@ -58,33 +57,29 @@ class CommentScrapper(ABC):
             processed_comments = set()
             load_more = True
 
-            # Элемент, содержащий список комментариев
+        
             comments_list = self.driver.find_element(By.CLASS_NAME, "business-reviews-card-view__reviews-container")  
-            scrolled_container = self.driver.find_element(By.CLASS_NAME, "scroll__container")  # Элемент контейнера для прокрутки
+            # scrolled_container = self.driver.find_element(By.CLASS_NAME, "scroll__container")  
 
             while load_more:
-                # Получаем видимые комментарии
-                visible_comments = comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")  # Замените на класс комментариев
+    
+                visible_comments = comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")  
                 if len(visible_comments) == 0:
                     print("No comments found")
                     return
 
-                # Обрабатываем видимые комментарии
                 for comment_element in visible_comments:
                     comment_text = comment_element.text
                     if comment_text in processed_comments:
                         continue
 
-                    # Запоминаем уникальные комментарии
                     processed_comments.add(comment_text)
                     print(f"New comment: {comment_text}")
 
                 try:
-                    # Прокручиваем до конца списка комментариев
                     js("arguments[0].scrollIntoView(true);", visible_comments[-1])
-                    time.sleep(2)  # Небольшая пауза для загрузки новых элементов
+                    time.sleep(2) 
 
-                    # Ожидаем появления новых комментариев
                     wait.until(lambda driver: len(comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")) > len(visible_comments))
 
                 except TimeoutException:
@@ -92,20 +87,11 @@ class CommentScrapper(ABC):
                     load_more = False
 
                 finally:
-                    # Проверка: если новых комментариев не добавилось, останавливаем прокрутку
                     new_visible_comments = comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")
                     if len(new_visible_comments) == len(processed_comments):
                         load_more = False
 
             print("Finished scrolling and scraping comments.")
-
-            # comments = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__body-text'))))
-            # usernames = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__author-name')))
-
-            # for i in range(len(comments)):
-            #     username = usernames[i].text
-            #     comment = comments[i].text
-            #     print(i, username, comment)
 
         except Exception as e:
             print("что-то не так", e)
