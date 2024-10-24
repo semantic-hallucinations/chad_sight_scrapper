@@ -28,13 +28,18 @@ class CommentScrapper(ABC):
         pass
 
     def get_url(self, filename: str) -> None:
+        new_json = []
         with open(filename, encoding="utf-8") as HohichJSON:
             content = json.loads(HohichJSON.read())
             for place in content:
                 place = json.loads(place)
-                self.get_sorce_code(place["url"], place)
+                x = self.get_source_code(place["url"], place)
+                new_json.append(x)
 
-    def get_source_code(self, URI: str, old_json:dict=None) -> None:
+        with open(filename, "w", encoding="utf-8") as json_file:
+            json.dump(new_json, json_file, ensure_ascii=False, indent=4) 
+
+    def get_source_code(self, URI: str, old_json: dict = None) -> dict:
         try:
             self.driver.get(url=URI)
         except:
@@ -50,7 +55,7 @@ class CommentScrapper(ABC):
             time.sleep(2)
 
             reviews_tab.send_keys(Keys.ENTER)
-            time.sleep(3)
+            time.sleep(2)
 
         
             js = self.driver.execute_script
@@ -96,17 +101,13 @@ class CommentScrapper(ABC):
                             "comment": comment_text,
                             "rating": rating
                         })
-                        
-                        # print(f"New comment from {user_name}, rating {rating}: {comment_text} (Link: {user_link})")
                     
                     except Exception as e:
                         print("scip error comment", e)
-
-
                 try:
                     # Прокручиваем до конца списка комментариев
                     js("arguments[0].scrollIntoView(true);", visible_comments[-1])
-                    time.sleep(2)  # Небольшая пауза для загрузки новых элементов
+                    time.sleep(2)
 
                     # Ожидаем появления новых комментариев
                     wait.until(lambda driver: len(comments_list.find_elements(By.CLASS_NAME, "business-review-view__info")) > len(visible_comments))
@@ -122,14 +123,17 @@ class CommentScrapper(ABC):
                         load_more = False
 
             print("Finished scrolling and scraping comments.")
-            self.make_json(processed_comments, old_json)
-
+            try:
+                return self.make_json(processed_comments, old_json)
+            except:
+                print("Ссылка получена не из jsona")
 
         except Exception as e:
             print("что-то не так", e)
 
-    def make_json(self, old_json: dict):
-        pass
+    def make_json(self, processed_comments, old_json: dict) -> dict:
+        old_json["reviews"] = processed_comments
+        return old_json 
     
     def close_driver(self):
         self.driver.quit()
@@ -163,9 +167,9 @@ class ScrapperFactory():
 
 def main() -> None:
     scrapper = ScrapperFactory.make_scrapper("Chrome")
-    scrapper.get_sorce_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
+    # scrapper.get_source_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
     # scrapper.get_sorce_code("https://yandex.by/maps/org/lyubimoye_mesto/183920941504/?ll=29.224177%2C53.141682&z=14")
-    # scrapper.get_url("МинскБары.json")
+    scrapper.get_url("ГомельМузеи.json")
     scrapper.close_driver()
 
 
