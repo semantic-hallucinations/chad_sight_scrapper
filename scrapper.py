@@ -34,7 +34,7 @@ class CommentScrapper(ABC):
                 place = json.loads(place)
                 self.get_sorce_code(place["url"], place)
 
-    def get_sorce_code(self, URI: str, old_json=None) -> None:
+    def get_source_code(self, URI: str, old_json:dict=None) -> None:
         try:
             self.driver.get(url=URI)
         except:
@@ -71,10 +71,17 @@ class CommentScrapper(ABC):
                 # Обрабатываем видимые комментарии
                 for comment_element in visible_comments:
                     try:
-
-                        user_link_element = comment_element.find_element(By.CLASS_NAME, "business-review-view__link")
-                        user_name = user_link_element.find_element(By.TAG_NAME, "span").text
-                        user_link = user_link_element.get_attribute("href")
+                        try:
+                            user_link_element = comment_element.find_element(By.CLASS_NAME, "business-review-view__link")
+                            user_name = user_link_element.find_element(By.TAG_NAME, "span").text
+                            user_link = user_link_element.get_attribute("href")
+                        except:
+                            user_name_element = comment_element.find_element(By.CLASS_NAME, "business-review-view__author-name")
+                            user_name = user_name_element.find_element(By.TAG_NAME, "span").text
+                            user_link = "deleted_account"
+                        
+                        rating_element = comment_element.find_element(By.CSS_SELECTOR, "span[itemprop='reviewRating']")
+                        rating = rating_element.find_element(By.CSS_SELECTOR, "meta[itemprop='ratingValue']").get_attribute("content")
                         
                         comment_text_element = comment_element.find_element(By.CLASS_NAME, "business-review-view__body-text")
                         comment_text = comment_text_element.text
@@ -86,10 +93,11 @@ class CommentScrapper(ABC):
                         processed_comments.append({
                             "author": user_name,
                             "author_url": user_link,
-                            "comment": comment_text
+                            "comment": comment_text,
+                            "rating": rating
                         })
                         
-                        print(f"New comment from {user_name}: {comment_text} (Link: {user_link})")
+                        # print(f"New comment from {user_name}, rating {rating}: {comment_text} (Link: {user_link})")
                     
                     except Exception as e:
                         print("scip error comment", e)
@@ -114,18 +122,14 @@ class CommentScrapper(ABC):
                         load_more = False
 
             print("Finished scrolling and scraping comments.")
+            self.make_json(processed_comments, old_json)
 
-            # comments = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__body-text'))))
-            # usernames = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'business-review-view__author-name')))
-
-            # for i in range(len(comments)):
-            #     username = usernames[i].text
-            #     comment = comments[i].text
-            #     print(i, username, comment)
 
         except Exception as e:
             print("что-то не так", e)
 
+    def make_json(self, old_json: dict):
+        pass
     
     def close_driver(self):
         self.driver.quit()
@@ -159,9 +163,8 @@ class ScrapperFactory():
 
 def main() -> None:
     scrapper = ScrapperFactory.make_scrapper("Chrome")
-    # scrapper.get_sorce_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
-    # scrapper.get_sorce_code("https://yandex.by/maps/org/kostel_sviatykh_symona_ta_oleny/1013424966/?ll=27.547675%2C53.896320&z=17")
-    scrapper.get_sorce_code("https://yandex.by/maps/org/lyubimoye_mesto/183920941504/?ll=29.224177%2C53.141682&z=14")
+    scrapper.get_sorce_code("https://yandex.by/maps/org/cinema_bar/239834013499/")
+    # scrapper.get_sorce_code("https://yandex.by/maps/org/lyubimoye_mesto/183920941504/?ll=29.224177%2C53.141682&z=14")
     # scrapper.get_url("МинскБары.json")
     scrapper.close_driver()
 
